@@ -178,11 +178,10 @@ interpreted exactly as a standard JSON parser does, including `\uXXXX` for contr
 ### 6.2 Preserving the rest of the file
 The app must not reformat the file beyond changing `textContent`:
 
-- Parse the template with an **order-preserving** JSON parser (Go’s `map[string]any` does not
-  preserve key order and must not be used for output).
-- Replace only the value of `textContent`.
-- Serialize with the same style as the sample: 2-space indentation, `"key": value` formatting,
-  same key order, and same handling of the trailing newline as the original file.
+- Parse the template with `encoding/json` and replace only the value of `textContent`.
+- Serialize with `encoding/json`: 2-space indentation, same trailing newline as the original.
+  Key order is not preserved (decided by the maintainer): keys are written sorted. Output is
+  therefore not byte-identical to VEXcode's layout. Do not hand-roll escaping or indentation.
 - Values such as `false`, `null`, `[]`, nested `aiVisionSettings`, `sdkVersion`, `appVersion`,
   `fileFormat`, `slot`, etc. are copied verbatim, including their types and empty arrays.
 - Verify that: `diff` between the original and the regenerated file, when the `.py` content is

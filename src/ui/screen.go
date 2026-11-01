@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/a-h/templ"
+
+	"vexiqtools/iqsync"
 )
 
 type Direction string
@@ -58,9 +60,10 @@ func (s Snapshot) StatusText() string {
 
 // Screen holds the UI state and pushes changes to every open SSE stream.
 type Screen struct {
-	mu   sync.Mutex
-	snap Snapshot
-	subs map[chan string]struct{}
+	mu      sync.Mutex
+	snap    Snapshot
+	subs    map[chan string]struct{}
+	watcher *iqsync.Watcher
 }
 
 func NewScreen() *Screen {
@@ -100,6 +103,13 @@ func (s *Screen) Start(direction Direction) {
 		s.publishLocked()
 		return
 	}
+	w, err := iqsync.Start(s.snap.Dir, direction == PyToIQ, s.appendLog, s.fail)
+	if err != nil {
+		s.snap.Err = err.Error()
+		s.publishLocked()
+		return
+	}
+	s.watcher = w
 	s.snap.Direction = direction
 	s.snap.Watching = true
 	s.snap.Err = ""
@@ -109,13 +119,39 @@ func (s *Screen) Start(direction Direction) {
 
 func (s *Screen) Stop() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if !s.snap.Watching {
+		s.mu.Unlock()
 		return
 	}
+	w := s.watcher
+	s.watcher = nil
 	s.snap.Watching = false
 	s.snap.Err = ""
 	s.logLocked("Stopped watching")
+	s.publishLocked()
+	s.mu.Unlock()
+
+	// Stop outside the lock: the watcher's goroutine may be waiting for the lock to log.
+	if w != nil {
+		w.Stop()
+	}
+}
+
+// appendLog is called by the watcher goroutine.
+func (s *Screen) appendLog(msg string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.logLocked(msg)
+	s.publishLocked()
+}
+
+// fail is called by the watcher goroutine on a watcher-level failure (FR-5.2).
+func (s *Screen) fail(msg string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.watcher = nil
+	s.snap.Watching = false
+	s.snap.Err = msg
 	s.publishLocked()
 }
 
