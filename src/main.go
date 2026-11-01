@@ -24,6 +24,11 @@ func main() {
 			PromptForSingleSelection()
 	}
 
+	settingsPath, err := ui.DefaultSettingsPath()
+	if err != nil {
+		log.Printf("settings are not saved: %v", err)
+	}
+
 	static, err := fs.Sub(staticFiles, "static")
 	if err != nil {
 		log.Fatal(err)
@@ -33,7 +38,7 @@ func main() {
 		Name:        "Tools for Vex IQ",
 		Description: "Tools for VEX IQ developers",
 		Assets: application.AssetOptions{
-			Handler: ui.NewHandler(static, pickDirectory),
+			Handler: ui.NewHandler(static, pickDirectory, settingsPath),
 		},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,

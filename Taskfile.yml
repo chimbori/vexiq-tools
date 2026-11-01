@@ -5,7 +5,7 @@ tasks:
     desc: Install development dependencies (macOS only)
     summary: |
       Installs Xcode Command Line Tools (if missing), then Homebrew packages (go, go-task,
-      tailwindcss). Safe to re-run.
+      tailwindcss, librsvg, imagemagick). Safe to re-run.
     preconditions:
       - sh: test "$(uname -s)" = "Darwin"
         msg: "The setup task currently supports macOS only."

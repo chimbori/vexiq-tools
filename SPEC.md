@@ -41,7 +41,7 @@ project files. It is designed to hold multiple small tools over time.
   file from its `textContent`.
 - Keep every other field of the `.iqpython` file unchanged in value.
 - Present a very basic single-screen UI.
-- Remember the directory and running state across launches (planned, FR-1.5).
+- Remember the directory and running state across launches (FR-1.5).
 
 ### Non-Goals (v1)
 - Recursive watching of subdirectories.
@@ -58,7 +58,7 @@ The app opens to one window titled "Tools for Vex IQ". The window contains, top 
 1. **Header:** the tool name "IQ Sync", with a short description in smaller text beneath it.
 2. **Directory row:** a read-only label showing the selected directory path (or "No directory
    selected"), and a **Choose Directory…** button. When the selected directory is not inside a
-   Git repository, a warning is shown below this row (FR-1.4, planned).
+   Git repository, a warning is shown below this row (FR-1.4).
 3. **Control row:** a **Start Watching** / **Stop Watching** toggle button. Disabled until a
    directory is selected.
 4. **Status line:** one of `Idle`, `Watching <path>`, or `Error: <message>`.
@@ -73,8 +73,8 @@ The app opens to one window titled "Tools for Vex IQ". The window contains, top 
    - The log is capped at the most recent 500 entries.
 
 ### 4.2 Interaction Rules
-- Watching starts only when the user clicks **Start Watching**. Starting on launch is planned
-  (FR-1.5).
+- Watching starts when the user clicks **Start Watching**, or on launch if it was active when
+  the app last quit (FR-1.5).
 - The directory can only be changed while stopped.
 - Status moves between `Idle` and `Watching`, and to `Error` on watcher-level failure (FR-5.2).
 - Sync latency follows NFR-1. Usage instructions are in `README.md`.
@@ -86,12 +86,12 @@ The app opens to one window titled "Tools for Vex IQ". The window contains, top 
 - FR-1.2: The selected directory must exist and be writable. The app checks this with a
   temporary probe file. Otherwise it shows an error and does not start watching.
 - FR-1.3: Watching always syncs in both directions (see §5.2). There is no direction setting.
-- FR-1.4 (planned): After a directory is selected, the app checks whether it is inside a Git
+- FR-1.4: After a directory is selected, the app checks whether it is inside a Git
   repository, that is, whether it or any ancestor directory contains a `.git` entry (directory
   or file). If not, it shows a warning in the UI, for example "Not in a Git repository." The
   warning is informational only: it does not block watching and requires no confirmation. The
   warning is cleared when a directory inside a repository is selected.
-- FR-1.5 (planned): The directory and whether watching was active are saved to a settings file
+- FR-1.5: The directory and whether watching was active are saved to a settings file
   in the user’s config directory whenever they change. On launch they are restored. If the saved
   directory still exists and is writable and watching was active, watching resumes. Otherwise
   the app shows the error from FR-1.2 and stays stopped. The Git check (FR-1.4) runs on restore
@@ -263,8 +263,9 @@ section on the main screen.
   - `GET /events` — SSE stream. Sends the full `panel` and `log` state on connect, then again on
     every change.
 - Watcher runs in its own goroutine; state is guarded by a mutex.
-- Settings (FR-1.5) are planned. They will be stored as `settings.json` under
-  `os.UserConfigDir()` in a folder named `Tools for Vex IQ`, with atomic writes.
+- Settings (FR-1.5) are stored as `settings.json` under `os.UserConfigDir()` in a folder
+  named `Tools for Vex IQ`, with atomic writes. The file holds only the directory and the
+  watching flag.
 
 ### 7.3 Frontend
 - Single page with no routing. Each UI section is a Templ component that HTMX can replace.
@@ -287,7 +288,7 @@ section on the main screen.
 | Situation | Behavior |
 |---|---|
 | Directory missing or not writable | Show error; watching does not start. |
-| Directory not inside a Git repository (planned) | Show warning (FR-1.4); watching still starts. |
+| Directory not inside a Git repository | Show warning (FR-1.4); watching still starts. |
 | `.py` unreadable | Log error; skip. |
 | `.iqpython` invalid JSON | Log error; do not overwrite. |
 | `.iqpython` missing (Python → IQ) | Create from template; log. |
@@ -296,8 +297,8 @@ section on the main screen.
 | File deleted while watching | Log `Ignored deletion`; nothing else changes (FR-2.5). |
 | Write/rename failure | Log error; remove temp file; original untouched. |
 | Directory removed while watching | Status shows `Error`; stop watching. |
-| Saved directory missing or not writable on launch (planned) | Show error; stay stopped. |
-| Settings missing, unreadable, or invalid (planned) | Use defaults (none, stopped); log. |
+| Saved directory missing or not writable on launch | Show error; stay stopped. |
+| Settings missing, unreadable, or invalid | Use defaults (none, stopped); log. |
 
 ## 10. Testing
 
@@ -324,20 +325,20 @@ section on the main screen.
     (`TestWatcherLogsDeletionAndIgnoresIt`).
   - Both files changed in one debounce window: the later change wins
     (`TestWatcherLaterChangeWinsWhenBothFilesChange`).
+  - An atomic save is not logged as a deletion (`TestWatcherAtomicSaveIsNotADeletion`).
   - Atomic writes leave no temp file (`TestWriteFileAtomicReplacesAndLeavesNoTemp`).
+  - Restore on launch, saving on stop, and the Git warning (`src/ui/screen_test.go`).
   - UI: page, static asset, directory picker fragment, start and stop, log cap, and the SSE
     stream (`src/ui/handler_test.go`, `TestLogIsCapped`).
 - **Planned: Go unit tests**
   - Events for other files are ignored. Debounce: multiple rapid writes produce one sync.
   - Deleting a `.iqpython` is logged and leaves the `.py` untouched.
-  - Settings: save and restore round trip; a missing or invalid settings file falls back to
-    defaults.
 - **Manual tests**
   - Pick a directory, start, edit `.py` in an editor, and confirm `.iqpython` opens correctly in
     VEXcode IQ.
   - An atomic save from an editor (e.g., VS Code) triggers a sync.
   - Stop watching; further edits do nothing.
-  - Quit and relaunch: the directory and watching state are restored (planned).
+  - Quit and relaunch: the directory and watching state are restored.
   - Edit `.py` in an editor; confirm `.iqpython` updates and `.py` is not rewritten.
   - Edit `.iqpython` in VEXcode IQ; confirm the matching `.py` updates.
   - Save a file without changing it; confirm no log entry and no write.

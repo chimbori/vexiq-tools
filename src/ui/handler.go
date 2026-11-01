@@ -7,9 +7,11 @@ import (
 
 // NewHandler serves the single-screen UI, its static assets, the HTMX endpoints, and the SSE
 // stream. pickDirectory opens the native directory chooser and returns the selected path, or an
-// empty string if the user cancelled.
-func NewHandler(static fs.FS, pickDirectory func() (string, error)) http.Handler {
-	screen := NewScreen()
+// empty string if the user cancelled. The directory and watching state are saved to and restored
+// from settingsPath, which may be empty to disable saving.
+func NewHandler(static fs.FS, pickDirectory func() (string, error), settingsPath string) http.Handler {
+	screen := NewScreen(settingsPath)
+	screen.Restore()
 	mux := http.NewServeMux()
 
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(static)))

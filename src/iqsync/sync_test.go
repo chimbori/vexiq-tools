@@ -255,3 +255,23 @@ func TestWatcherLaterChangeWinsWhenBothFilesChange(t *testing.T) {
 		t.Fatalf("Foo.py = %q, want the later change %q", got, "c\n")
 	}
 }
+
+func TestWatcherAtomicSaveIsNotADeletion(t *testing.T) {
+	dir := t.TempDir()
+	writeTemp(t, dir, "Foo.py", "a\n")
+	if _, err := PyToIQ(dir, "Foo"); err != nil {
+		t.Fatal(err)
+	}
+	logs, failures := startWatcher(t, dir)
+
+	if err := WriteFileAtomic(filepath.Join(dir, "Foo.py"), []byte("b\n")); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, logs, failures, "Updated Foo.iqpython from Foo.py")
+
+	writeTemp(t, dir, "Marker.py", "")
+	seen := waitFor(t, logs, failures, "Created Marker.iqpython from template")
+	if containsPrefix(seen, "Ignored deletion") {
+		t.Fatalf("atomic save was logged as a deletion: %q", seen)
+	}
+}

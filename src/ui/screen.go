@@ -2,11 +2,14 @@ package ui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -28,6 +31,7 @@ type Snapshot struct {
 	Dir      string
 	Watching bool
 	Err      string
+	NotInGit bool
 	Log      []LogEntry
 }
 
@@ -48,11 +52,33 @@ type Screen struct {
 	snap    Snapshot
 	subs    map[chan string]struct{}
 	watcher *iqsync.Watcher
+	// settingsPath is where the state is saved. Empty means nothing is saved.
+	settingsPath string
 }
 
-func NewScreen() *Screen {
+func NewScreen(settingsPath string) *Screen {
 	return &Screen{
-		subs: make(map[chan string]struct{}),
+		subs:         make(map[chan string]struct{}),
+		settingsPath: settingsPath,
+	}
+}
+
+// Restore loads the saved directory and watching state (FR-1.5). A missing or invalid settings
+// file leaves the defaults in place.
+func (s *Screen) Restore() {
+	if s.settingsPath == "" {
+		return
+	}
+	saved, err := loadSettings(s.settingsPath)
+	if err != nil {
+		if !errors.Is(err, fs.ErrNotExist) {
+			log.Printf("settings: %v", err)
+		}
+		return
+	}
+	s.SetDirectory(saved.Dir)
+	if saved.Watching {
+		s.Start()
 	}
 }
 
@@ -72,6 +98,8 @@ func (s *Screen) SetDirectory(dir string) {
 	}
 	s.snap.Dir = dir
 	s.snap.Err = ""
+	s.snap.NotInGit = dir != "" && !inGitRepo(dir)
+	s.saveLocked()
 	s.publishLocked()
 }
 
@@ -96,6 +124,7 @@ func (s *Screen) Start() {
 	s.snap.Watching = true
 	s.snap.Err = ""
 	s.logLocked("Started watching " + s.snap.Dir)
+	s.saveLocked()
 	s.publishLocked()
 }
 
@@ -110,6 +139,7 @@ func (s *Screen) Stop() {
 	s.snap.Watching = false
 	s.snap.Err = ""
 	s.logLocked("Stopped watching")
+	s.saveLocked()
 	s.publishLocked()
 	s.mu.Unlock()
 
@@ -134,7 +164,32 @@ func (s *Screen) fail(msg string) {
 	s.watcher = nil
 	s.snap.Watching = false
 	s.snap.Err = msg
+	s.saveLocked()
 	s.publishLocked()
+}
+
+// inGitRepo reports whether dir or an ancestor contains a .git entry (FR-1.4).
+func inGitRepo(dir string) bool {
+	for d := dir; ; {
+		if _, err := os.Stat(filepath.Join(d, ".git")); err == nil {
+			return true
+		}
+		parent := filepath.Dir(d)
+		if parent == d {
+			return false
+		}
+		d = parent
+	}
+}
+
+// saveLocked writes the directory and watching state to the settings file (FR-1.5).
+func (s *Screen) saveLocked() {
+	if s.settingsPath == "" {
+		return
+	}
+	if err := saveSettings(s.settingsPath, settings{Dir: s.snap.Dir, Watching: s.snap.Watching}); err != nil {
+		log.Printf("settings: %v", err)
+	}
 }
 
 // checkWatchable returns a user-facing reason why dir cannot be watched, or "" if it can.

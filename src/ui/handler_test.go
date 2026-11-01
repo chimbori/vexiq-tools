@@ -14,7 +14,7 @@ import (
 
 func newTestHandler() http.Handler {
 	static := fstest.MapFS{"htmx.min.js": {Data: []byte("//htmx")}}
-	return NewHandler(static, func() (string, error) { return "/tmp/vex", nil })
+	return NewHandler(static, func() (string, error) { return "/tmp/vex", nil }, "")
 }
 
 func postForm(t *testing.T, h http.Handler, path string, form url.Values) *httptest.ResponseRecorder {
@@ -57,7 +57,7 @@ func TestPickDirectoryReturnsFragment(t *testing.T) {
 }
 
 func TestStartWithoutDirectoryShowsError(t *testing.T) {
-	h := NewHandler(fstest.MapFS{}, func() (string, error) { return "", nil })
+	h := NewHandler(fstest.MapFS{}, func() (string, error) { return "", nil }, "")
 	rec := postForm(t, h, "/start", nil)
 
 	if !strings.Contains(rec.Body.String(), "Error: Choose a directory first.") {
@@ -67,7 +67,7 @@ func TestStartWithoutDirectoryShowsError(t *testing.T) {
 
 func TestStartAndStopWatching(t *testing.T) {
 	dir := t.TempDir()
-	h := NewHandler(fstest.MapFS{}, func() (string, error) { return dir, nil })
+	h := NewHandler(fstest.MapFS{}, func() (string, error) { return dir, nil }, "")
 	postForm(t, h, "/pick-directory", nil)
 
 	rec := postForm(t, h, "/start", nil)
@@ -82,7 +82,7 @@ func TestStartAndStopWatching(t *testing.T) {
 }
 
 func TestLogIsCapped(t *testing.T) {
-	s := NewScreen()
+	s := NewScreen("")
 	s.mu.Lock()
 	for range maxLogEntries + 50 {
 		s.logLocked("entry")

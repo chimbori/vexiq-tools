@@ -90,6 +90,11 @@ func isPairFile(name string) bool {
 	return false
 }
 
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
 // pairOther returns the name of the file that pairs with name, such as Foo.iqpython for Foo.py.
 func pairOther(name string) string {
 	if strings.HasSuffix(name, ".iqpython") {
@@ -131,12 +136,15 @@ func (w *Watcher) run() {
 			if !isPairFile(name) {
 				continue
 			}
-			if ev.Has(fsnotify.Remove) {
+			// An atomic save replaces a file by renaming over it, which can also report Remove.
+			// It is a deletion only if the file is gone.
+			if ev.Has(fsnotify.Remove) && !fileExists(ev.Name) {
 				delete(w.hashes, name)
 				w.logf("Ignored deletion of " + name)
 				continue
 			}
-			if !ev.Has(fsnotify.Create) && !ev.Has(fsnotify.Write) && !ev.Has(fsnotify.Rename) {
+			if !ev.Has(fsnotify.Create) && !ev.Has(fsnotify.Write) && !ev.Has(fsnotify.Rename) &&
+				!ev.Has(fsnotify.Remove) {
 				continue
 			}
 			w.lastEvent[name] = time.Now()
