@@ -1,6 +1,6 @@
 package ui
 
-templ Page(dir string) {
+templ Page(s Snapshot) {
 	<!DOCTYPE html>
 	<html lang="en">
 		<head>
@@ -8,24 +8,62 @@ templ Page(dir string) {
 			<title>Tools for Vex IQ</title>
 			<link rel="stylesheet" href="/static/app.css"/>
 			<script src="/static/htmx.min.js" defer></script>
+			<script src="/static/htmx-sse.js" defer></script>
 		</head>
 		<body class="p-6 font-sans text-neutral-900">
-			<h1 class="text-xl font-semibold">IQ Sync</h1>
-			<p class="mb-6 text-sm text-neutral-600">Keep Python and IQPython files in sync.</p>
-			@DirectoryField(dir)
+			<div hx-ext="sse" sse-connect="/events">
+				<h1 class="text-xl font-semibold">IQ Sync</h1>
+				<p class="mb-6 text-sm text-neutral-600">Keep Python and IQPython files in sync.</p>
+				<div id="panel" sse-swap="panel" class="flex flex-col gap-3">
+					@PanelBody(s)
+				</div>
+				<ol id="log" sse-swap="log" class="mt-6 h-64 overflow-y-auto border-t border-neutral-200 pt-2 text-sm">
+					@LogItems(s.Log)
+				</ol>
+			</div>
 		</body>
 	</html>
 }
 
-templ DirectoryField(dir string) {
-	<div id="directory" class="flex items-center gap-3">
+templ PanelBody(s Snapshot) {
+	<div class="flex items-center gap-3">
 		<button
 			type="button"
 			hx-post="/pick-directory"
-			hx-target="#directory"
-			hx-swap="outerHTML"
-			class="rounded border border-neutral-400 px-3 py-1 hover:bg-neutral-100"
+			hx-target="#panel"
+			disabled?={ s.Watching }
+			class="rounded border border-neutral-400 px-3 py-1 hover:bg-neutral-100 disabled:opacity-50"
 		>Choose Directory…</button>
-		<span class="text-neutral-600">{ dir }</span>
+		if s.Dir == "" {
+			<span class="text-neutral-600">No directory selected</span>
+		} else {
+			<span class="text-neutral-600">{ s.Dir }</span>
+		}
 	</div>
+	<form class="flex items-center gap-3" hx-target="#panel">
+		<select name="direction" disabled?={ s.Watching } class="rounded border border-neutral-400 px-2 py-1 disabled:opacity-50">
+			<option value="py-to-iq" selected?={ s.Direction == PyToIQ }>Python → IQ</option>
+			<option value="iq-to-py" selected?={ s.Direction == IQToPy }>IQ → Python</option>
+		</select>
+		if s.Watching {
+			<button type="button" hx-post="/stop" class="rounded border border-neutral-400 px-3 py-1 hover:bg-neutral-100">Stop Watching</button>
+		} else {
+			<button
+				type="button"
+				hx-post="/start"
+				disabled?={ s.Dir == "" }
+				class="rounded border border-neutral-400 px-3 py-1 hover:bg-neutral-100 disabled:opacity-50"
+			>Start Watching</button>
+		}
+	</form>
+	<p class="text-sm">{ s.StatusText() }</p>
+}
+
+templ LogItems(entries []LogEntry) {
+	for _, e := range entries {
+		<li class="flex gap-3">
+			<time class="shrink-0 tabular-nums text-neutral-500">{ e.Time.Format("15:04:05") }</time>
+			<span>{ e.Message }</span>
+		</li>
+	}
 }
