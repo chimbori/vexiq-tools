@@ -1,0 +1,89 @@
+version: '3'
+
+tasks:
+  setup:
+    desc: Install development dependencies (macOS only)
+    summary: |
+      Installs Xcode Command Line Tools (if missing), then Homebrew packages (go, go-task,
+      tailwindcss). Safe to re-run.
+    preconditions:
+      - sh: test "$(uname -s)" = "Darwin"
+        msg: "The setup task currently supports macOS only."
+    cmds:
+      - xcode-select -p >/dev/null 2>&1 || xcode-select --install
+      - brew install go go-task tailwindcss librsvg imagemagick
+
+  css:
+    desc: Build the Tailwind CSS stylesheet
+    dir: src
+    cmds:
+      - tailwindcss -i styles/input.css -o static/app.css --minify
+
+  templ:
+    desc: Generate Go code from .templ files
+    dir: src
+    cmds:
+      - go tool templ generate
+
+  generate:
+    desc: Generate all derived files (templ code, CSS, and icons)
+    deps: [templ, css, icons]
+
+  icons:
+    desc: Generate app icons (macOS, Windows, Wails) from src/logo.svg
+    sources:
+      - src/logo.svg
+    generates:
+      - src/build/appicon.png
+      - src/build/darwin/icons.icns
+      - src/build/windows/icon.ico
+    cmds:
+      - mkdir -p gen/icons/icons.iconset
+      - for s in 16 32 48 64 128 256 512 1024; do rsvg-convert -w $s -h $s src/logo.svg -o gen/icons/$s.png; done
+      - cp gen/icons/1024.png src/build/appicon.png
+      - cp gen/icons/16.png gen/icons/icons.iconset/icon_16x16.png
+      - cp gen/icons/32.png gen/icons/icons.iconset/icon_16x16@2x.png
+      - cp gen/icons/32.png gen/icons/icons.iconset/icon_32x32.png
+      - cp gen/icons/64.png gen/icons/icons.iconset/icon_32x32@2x.png
+      - cp gen/icons/128.png gen/icons/icons.iconset/icon_128x128.png
+      - cp gen/icons/256.png gen/icons/icons.iconset/icon_128x128@2x.png
+      - cp gen/icons/256.png gen/icons/icons.iconset/icon_256x256.png
+      - cp gen/icons/512.png gen/icons/icons.iconset/icon_256x256@2x.png
+      - cp gen/icons/512.png gen/icons/icons.iconset/icon_512x512.png
+      - cp gen/icons/1024.png gen/icons/icons.iconset/icon_512x512@2x.png
+      - iconutil -c icns gen/icons/icons.iconset -o src/build/darwin/icons.icns
+      - magick gen/icons/16.png gen/icons/32.png gen/icons/48.png gen/icons/256.png src/build/windows/icon.ico
+
+  dev:
+    desc: Run the app from source
+    dir: src
+    deps: [generate]
+    cmds:
+      - go run .
+
+  test:
+    desc: Run Go unit tests
+    dir: src
+    deps: [generate]
+    cmds:
+      - go test ./...
+
+  build:
+    desc: Build the app binary for the current platform
+    dir: src
+    deps: [generate]
+    cmds:
+      - go build -tags production -o ../bin/vexiqtools .
+
+  app:
+    desc: Assemble the macOS app bundle (run build first)
+    deps: [build]
+    preconditions:
+      - sh: test "$(uname -s)" = "Darwin"
+        msg: "The app task currently supports macOS only."
+    cmds:
+      - rm -rf "bin/Tools for Vex IQ.app"
+      - mkdir -p "bin/Tools for Vex IQ.app/Contents/MacOS" "bin/Tools for Vex IQ.app/Contents/Resources"
+      - cp src/build/darwin/Info.plist "bin/Tools for Vex IQ.app/Contents/Info.plist"
+      - cp src/build/darwin/icons.icns "bin/Tools for Vex IQ.app/Contents/Resources/icons.icns"
+      - cp bin/vexiqtools "bin/Tools for Vex IQ.app/Contents/MacOS/vexiqtools"

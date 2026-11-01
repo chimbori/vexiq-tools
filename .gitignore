@@ -1,0 +1,9 @@
+.DS_Store
+.task/
+bin/
+gen/
+src/static/app.css
+src/**/*_templ.go
+src/build/appicon.png
+src/build/darwin/icons.icns
+src/build/windows/icon.ico

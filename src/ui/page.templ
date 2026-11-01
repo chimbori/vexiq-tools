@@ -1,0 +1,31 @@
+package ui
+
+templ Page(dir string) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<title>Tools for Vex IQ</title>
+			<link rel="stylesheet" href="/static/app.css"/>
+			<script src="/static/htmx.min.js" defer></script>
+		</head>
+		<body class="p-6 font-sans text-neutral-900">
+			<h1 class="text-xl font-semibold">IQ Sync</h1>
+			<p class="mb-6 text-sm text-neutral-600">Keep Python and IQPython files in sync.</p>
+			@DirectoryField(dir)
+		</body>
+	</html>
+}
+
+templ DirectoryField(dir string) {
+	<div id="directory" class="flex items-center gap-3">
+		<button
+			type="button"
+			hx-post="/pick-directory"
+			hx-target="#directory"
+			hx-swap="outerHTML"
+			class="rounded border border-neutral-400 px-3 py-1 hover:bg-neutral-100"
+		>Choose Directory…</button>
+		<span class="text-neutral-600">{ dir }</span>
+	</div>
+}

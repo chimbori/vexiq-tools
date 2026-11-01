@@ -1,0 +1,10 @@
+version: '3'
+
+info:
+  companyName: "Chimbori"
+  productName: "Tools for Vex IQ"
+  productIdentifier: "com.chimbori.vexiqtool"
+  description: "Tools for Vex IQ developers"
+  copyright: "© 2026 Chimbori"
+  comments: "Tools for Vex IQ developers"
+  version: "0.1.0"
