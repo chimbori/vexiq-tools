@@ -7,30 +7,30 @@ Runs on macOS, Windows, and Linux.
 
 ## Tools
 
-### Python ↔ IQPython Sync
+### IQ Sync
 
 VEXcode IQ stores your Python program inside a `.iqpython` project file. That makes the code
-awkward to edit outside VEXcode. This tool watches a folder and keeps each `.py` file and its
+awkward to edit outside VEXcode. IQ Sync watches a folder and keeps each `.py` file and its
 matching `.iqpython` file in step. Two files match when they have the same name apart from the
 extension, for example `Robot.py` and `Robot.iqpython`.
 
-You choose the direction when you start watching:
+Both directions are watched at the same time:
 
 - **Python → IQ:** when you save a `.py` file, its `.iqpython` file is updated with the new code.
 - **IQ → Python:** when you save a `.iqpython` file, its `.py` file is updated with the code from
   the project.
 
-Only the code is changed. All other settings in a `.iqpython` file are preserved.
+Only the code is changed. All other settings in a `.iqpython` file are preserved. A save that
+doesn’t change the content does nothing.
 
 ## Using the app
 
 1. Start Tools for Vex IQ.
 2. Click **Choose Directory…** and select the folder that contains your `.py` and `.iqpython`
    files.
-3. Pick a direction: **Python → IQ** (the default) or **IQ → Python**.
-4. Click **Start Watching**.
-5. Edit and save files as usual. Each sync appears in the activity log within about a second.
-6. Click **Stop Watching** when you are done.
+3. Click **Start Watching**.
+4. Edit and save files as usual. Each sync appears in the activity log within about a second.
+5. Click **Stop Watching** when you are done.
 
 Notes:
 
@@ -38,10 +38,10 @@ Notes:
 - If the folder is not inside a Git repository, the app shows a warning. Watching still works.
   We recommend keeping your project in Git so you can review and undo the changes the sync makes.
 - Watching does not start automatically. You must click **Start Watching** each time.
-- You can’t change the folder or the direction while watching. Stop first.
-- In Python → IQ mode, if a `.py` file has no matching `.iqpython` file, one is created from a
-  built-in template.
-- In IQ → Python mode, if a `.py` file doesn’t exist yet, it is created from the project’s code.
+- Starting to watch does not change existing files. Only later saves are synced.
+- You can’t change the folder while watching. Stop first.
+- If a `.py` file has no matching `.iqpython` file, one is created from a built-in template.
+- If a `.iqpython` file has no matching `.py` file, the `.py` file is created from the project’s code.
 - Deleting a file does not delete its match.
 - If a `.iqpython` file isn’t valid JSON, the app leaves it alone and logs an error.
 
@@ -50,9 +50,9 @@ Notes:
 | Problem | What to check |
 |---|---|
 | Start Watching is disabled | Choose a directory first. |
-| "Directory is not readable or writable" | Check the folder permissions. |
-| Log says `Skipped … invalid JSON` | Open the `.iqpython` file and check that it is valid JSON, or restore it from a backup. |
-| A save doesn’t sync | Make sure you are watching the right folder, in the right direction, and that the file is at the top level of the folder. |
+| "Folder is not writable." | Check the folder permissions. |
+| Log says `Error: … invalid character …` | Open the `.iqpython` file and check that it is valid JSON, or restore it from a backup. |
+| A save doesn’t sync | Make sure you are watching the right folder and that the file is at the top level of the folder. |
 | Changes don’t appear in VEXcode IQ | Close and reopen the project in VEXcode IQ. |
 
 ## Development

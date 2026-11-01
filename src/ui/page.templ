@@ -40,11 +40,7 @@ templ PanelBody(s Snapshot) {
 			<span class="text-neutral-600">{ s.Dir }</span>
 		}
 	</div>
-	<form class="flex items-center gap-3" hx-target="#panel">
-		<select name="direction" disabled?={ s.Watching } class="rounded border border-neutral-400 px-2 py-1 disabled:opacity-50">
-			<option value="py-to-iq" selected?={ s.Direction == PyToIQ }>Python → IQ</option>
-			<option value="iq-to-py" selected?={ s.Direction == IQToPy }>IQ → Python</option>
-		</select>
+	<div class="flex items-center gap-3" hx-target="#panel">
 		if s.Watching {
 			<button type="button" hx-post="/stop" class="rounded border border-neutral-400 px-3 py-1 hover:bg-neutral-100">Stop Watching</button>
 		} else {
@@ -55,7 +51,7 @@ templ PanelBody(s Snapshot) {
 				class="rounded border border-neutral-400 px-3 py-1 hover:bg-neutral-100 disabled:opacity-50"
 			>Start Watching</button>
 		}
-	</form>
+	</div>
 	<p class="text-sm">{ s.StatusText() }</p>
 }
 

@@ -31,12 +31,7 @@ func NewHandler(static fs.FS, pickDirectory func() (string, error)) http.Handler
 	})
 
 	mux.HandleFunc("POST /start", func(w http.ResponseWriter, r *http.Request) {
-		direction, ok := ParseDirection(r.FormValue("direction"))
-		if !ok {
-			http.Error(w, "unknown direction", http.StatusBadRequest)
-			return
-		}
-		screen.Start(direction)
+		screen.Start()
 		renderPanel(w, r, screen)
 	})
 

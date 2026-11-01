@@ -58,7 +58,7 @@ func TestPickDirectoryReturnsFragment(t *testing.T) {
 
 func TestStartWithoutDirectoryShowsError(t *testing.T) {
 	h := NewHandler(fstest.MapFS{}, func() (string, error) { return "", nil })
-	rec := postForm(t, h, "/start", url.Values{"direction": {"py-to-iq"}})
+	rec := postForm(t, h, "/start", nil)
 
 	if !strings.Contains(rec.Body.String(), "Error: Choose a directory first.") {
 		t.Errorf("POST /start body = %q, want no-directory error", rec.Body.String())
@@ -70,7 +70,7 @@ func TestStartAndStopWatching(t *testing.T) {
 	h := NewHandler(fstest.MapFS{}, func() (string, error) { return dir, nil })
 	postForm(t, h, "/pick-directory", nil)
 
-	rec := postForm(t, h, "/start", url.Values{"direction": {"iq-to-py"}})
+	rec := postForm(t, h, "/start", nil)
 	if !strings.Contains(rec.Body.String(), "Stop Watching") {
 		t.Errorf("POST /start body does not show Stop Watching: %q", rec.Body.String())
 	}
@@ -78,14 +78,6 @@ func TestStartAndStopWatching(t *testing.T) {
 	rec = postForm(t, h, "/stop", nil)
 	if !strings.Contains(rec.Body.String(), "Start Watching") {
 		t.Errorf("POST /stop body does not show Start Watching: %q", rec.Body.String())
-	}
-}
-
-func TestStartRejectsUnknownDirection(t *testing.T) {
-	rec := postForm(t, newTestHandler(), "/start", url.Values{"direction": {"sideways"}})
-
-	if rec.Code != http.StatusBadRequest {
-		t.Errorf("POST /start status = %d, want 400", rec.Code)
 	}
 }
 

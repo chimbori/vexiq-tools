@@ -1,6 +1,7 @@
 package iqsync
 
 import (
+	"crypto/sha256"
 	"errors"
 	"io/fs"
 	"os"
@@ -15,10 +16,10 @@ import (
 // debounce is how long a file must be quiet before it is synced (FR-2.4).
 const debounce = 300 * time.Millisecond
 
-// Watcher syncs changed files in one directory until Stop is called.
+// Watcher syncs changed .py and .iqpython files in one directory until Stop is called.
 type Watcher struct {
 	dir      string
-	pyToIQ   bool
+	hashes   map[string][sha256.Size]byte
 	logf     func(string)
 	failf    func(string)
 	fsw      *fsnotify.Watcher
@@ -28,10 +29,10 @@ type Watcher struct {
 	wg       sync.WaitGroup
 }
 
-// Start watches the top level of dir (FR-2.1). In Python → IQ mode (pyToIQ) only .py files are
-// synced, otherwise only .iqpython files (FR-2.2). Log messages go to logf. A watcher-level
+// Start watches the top level of dir (FR-2.1). Both .py and .iqpython files are watched (FR-2.2).
+// Existing files are hashed but not synced (FR-2.8). Log messages go to logf. A watcher-level
 // failure calls failf and stops the watcher (FR-5.2).
-func Start(dir string, pyToIQ bool, logf, failf func(string)) (*Watcher, error) {
+func Start(dir string, logf, failf func(string)) (*Watcher, error) {
 	dir = filepath.Clean(dir)
 	fsw, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -43,7 +44,7 @@ func Start(dir string, pyToIQ bool, logf, failf func(string)) (*Watcher, error) 
 	}
 	w := &Watcher{
 		dir:    dir,
-		pyToIQ: pyToIQ,
+		hashes: seedHashes(dir),
 		logf:   logf,
 		failf:  failf,
 		fsw:    fsw,
@@ -61,11 +62,28 @@ func (w *Watcher) Stop() {
 	w.wg.Wait()
 }
 
-func (w *Watcher) ext() string {
-	if w.pyToIQ {
-		return ".py"
+func seedHashes(dir string) map[string][sha256.Size]byte {
+	hashes := map[string][sha256.Size]byte{}
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if e.IsDir() || !isPairFile(e.Name()) {
+			continue
+		}
+		if data, err := os.ReadFile(filepath.Join(dir, e.Name())); err == nil {
+			hashes[e.Name()] = sha256.Sum256(data)
+		}
 	}
-	return ".iqpython"
+	return hashes
+}
+
+// isPairFile reports whether name is a .py or .iqpython file with a non-empty stem.
+func isPairFile(name string) bool {
+	for _, ext := range []string{".py", ".iqpython"} {
+		if strings.HasSuffix(name, ext) && len(name) > len(ext) {
+			return true
+		}
+	}
+	return false
 }
 
 func (w *Watcher) run() {
@@ -99,10 +117,11 @@ func (w *Watcher) run() {
 				continue
 			}
 			name := filepath.Base(ev.Name)
-			if !strings.HasSuffix(name, w.ext()) || len(name) == len(w.ext()) {
+			if !isPairFile(name) {
 				continue
 			}
 			if ev.Has(fsnotify.Remove) {
+				delete(w.hashes, name)
 				w.logf("Ignored deletion of " + name)
 				continue
 			}
@@ -120,29 +139,40 @@ func (w *Watcher) run() {
 				}
 			})
 		case name := <-w.fire:
+			delete(timers, name)
 			w.syncFile(name)
 		}
 	}
 }
 
+// syncFile syncs the pair that name belongs to, unless the file content is the same as the last
+// content seen. Writing a target records its hash, so the watcher event caused by that write is
+// skipped and the two directions never trigger each other (FR-2.6, FR-2.7).
 func (w *Watcher) syncFile(name string) {
-	// A rename away from the folder reports the old name, which no longer exists. Skip it.
-	if _, err := os.Stat(filepath.Join(w.dir, name)); errors.Is(err, fs.ErrNotExist) {
+	data, err := os.ReadFile(filepath.Join(w.dir, name))
+	if errors.Is(err, fs.ErrNotExist) {
+		// A rename away from the folder reports the old name, which no longer exists.
 		return
-	}
-	stem := strings.TrimSuffix(name, w.ext())
-	var msg string
-	var err error
-	if w.pyToIQ {
-		msg, err = PyToIQ(w.dir, stem)
-	} else {
-		msg, err = IQToPy(w.dir, stem)
 	}
 	if err != nil {
 		w.logf("Error: " + err.Error())
 		return
 	}
-	if msg != "" {
-		w.logf(msg)
+	sum := sha256.Sum256(data)
+	if prev, ok := w.hashes[name]; ok && prev == sum {
+		return
+	}
+	w.hashes[name] = sum
+
+	res, err := SyncFile(w.dir, name)
+	if err != nil {
+		w.logf("Error: " + err.Error())
+		return
+	}
+	if res.Target != "" {
+		w.hashes[res.Target] = sha256.Sum256(res.Data)
+	}
+	if res.Message != "" {
+		w.logf(res.Message)
 	}
 }

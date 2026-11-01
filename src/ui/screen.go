@@ -17,22 +17,7 @@ import (
 	"vexiqtools/iqsync"
 )
 
-type Direction string
-
-const (
-	PyToIQ Direction = "py-to-iq"
-	IQToPy Direction = "iq-to-py"
-)
-
 const maxLogEntries = 500
-
-func ParseDirection(s string) (Direction, bool) {
-	switch d := Direction(s); d {
-	case PyToIQ, IQToPy:
-		return d, true
-	}
-	return "", false
-}
 
 type LogEntry struct {
 	Time    time.Time
@@ -40,11 +25,10 @@ type LogEntry struct {
 }
 
 type Snapshot struct {
-	Dir       string
-	Direction Direction
-	Watching  bool
-	Err       string
-	Log       []LogEntry
+	Dir      string
+	Watching bool
+	Err      string
+	Log      []LogEntry
 }
 
 func (s Snapshot) StatusText() string {
@@ -68,7 +52,6 @@ type Screen struct {
 
 func NewScreen() *Screen {
 	return &Screen{
-		snap: Snapshot{Direction: PyToIQ},
 		subs: make(map[chan string]struct{}),
 	}
 }
@@ -92,7 +75,7 @@ func (s *Screen) SetDirectory(dir string) {
 	s.publishLocked()
 }
 
-func (s *Screen) Start(direction Direction) {
+func (s *Screen) Start() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.snap.Watching {
@@ -103,14 +86,13 @@ func (s *Screen) Start(direction Direction) {
 		s.publishLocked()
 		return
 	}
-	w, err := iqsync.Start(s.snap.Dir, direction == PyToIQ, s.appendLog, s.fail)
+	w, err := iqsync.Start(s.snap.Dir, s.appendLog, s.fail)
 	if err != nil {
 		s.snap.Err = err.Error()
 		s.publishLocked()
 		return
 	}
 	s.watcher = w
-	s.snap.Direction = direction
 	s.snap.Watching = true
 	s.snap.Err = ""
 	s.logLocked("Started watching " + s.snap.Dir)
