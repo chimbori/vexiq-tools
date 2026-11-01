@@ -18,15 +18,17 @@ const debounce = 300 * time.Millisecond
 
 // Watcher syncs changed .py and .iqpython files in one directory until Stop is called.
 type Watcher struct {
-	dir      string
-	hashes   map[string][sha256.Size]byte
-	logf     func(string)
-	failf    func(string)
-	fsw      *fsnotify.Watcher
-	fire     chan string
-	done     chan struct{}
-	stopOnce sync.Once
-	wg       sync.WaitGroup
+	dir       string
+	hashes    map[string][sha256.Size]byte
+	timers    map[string]*time.Timer
+	lastEvent map[string]time.Time
+	logf      func(string)
+	failf     func(string)
+	fsw       *fsnotify.Watcher
+	fire      chan string
+	done      chan struct{}
+	stopOnce  sync.Once
+	wg        sync.WaitGroup
 }
 
 // Start watches the top level of dir (FR-2.1). Both .py and .iqpython files are watched (FR-2.2).
@@ -43,13 +45,15 @@ func Start(dir string, logf, failf func(string)) (*Watcher, error) {
 		return nil, err
 	}
 	w := &Watcher{
-		dir:    dir,
-		hashes: seedHashes(dir),
-		logf:   logf,
-		failf:  failf,
-		fsw:    fsw,
-		fire:   make(chan string),
-		done:   make(chan struct{}),
+		dir:       dir,
+		hashes:    seedHashes(dir),
+		timers:    map[string]*time.Timer{},
+		lastEvent: map[string]time.Time{},
+		logf:      logf,
+		failf:     failf,
+		fsw:       fsw,
+		fire:      make(chan string),
+		done:      make(chan struct{}),
 	}
 	w.wg.Add(1)
 	go w.run()
@@ -86,12 +90,19 @@ func isPairFile(name string) bool {
 	return false
 }
 
+// pairOther returns the name of the file that pairs with name, such as Foo.iqpython for Foo.py.
+func pairOther(name string) string {
+	if strings.HasSuffix(name, ".iqpython") {
+		return strings.TrimSuffix(name, ".iqpython") + ".py"
+	}
+	return strings.TrimSuffix(name, ".py") + ".iqpython"
+}
+
 func (w *Watcher) run() {
 	defer w.wg.Done()
 	defer func() { _ = w.fsw.Close() }()
-	timers := map[string]*time.Timer{}
 	defer func() {
-		for _, t := range timers {
+		for _, t := range w.timers {
 			t.Stop()
 		}
 	}()
@@ -128,21 +139,43 @@ func (w *Watcher) run() {
 			if !ev.Has(fsnotify.Create) && !ev.Has(fsnotify.Write) && !ev.Has(fsnotify.Rename) {
 				continue
 			}
-			if t, ok := timers[name]; ok {
+			w.lastEvent[name] = time.Now()
+			if t, ok := w.timers[name]; ok {
 				t.Reset(debounce)
 				continue
 			}
-			timers[name] = time.AfterFunc(debounce, func() {
+			w.timers[name] = time.AfterFunc(debounce, func() {
 				select {
 				case w.fire <- name:
 				case <-w.done:
 				}
 			})
 		case name := <-w.fire:
-			delete(timers, name)
+			delete(w.timers, name)
+			if w.superseded(name) {
+				continue
+			}
 			w.syncFile(name)
 		}
 	}
+}
+
+// superseded reports whether the paired file changed later and is still waiting to sync. That
+// later change wins (FR-2.9), so name must not overwrite it. A later event with unchanged content
+// (such as a touch) does not count, so name still syncs.
+func (w *Watcher) superseded(name string) bool {
+	other := pairOther(name)
+	if _, pending := w.timers[other]; !pending {
+		return false
+	}
+	if !w.lastEvent[other].After(w.lastEvent[name]) {
+		return false
+	}
+	data, err := os.ReadFile(filepath.Join(w.dir, other))
+	if err != nil {
+		return false
+	}
+	return sha256.Sum256(data) != w.hashes[other]
 }
 
 // syncFile syncs the pair that name belongs to, unless the file content is the same as the last

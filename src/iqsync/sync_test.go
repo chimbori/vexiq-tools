@@ -233,3 +233,25 @@ func TestWatcherLogsDeletionAndIgnoresIt(t *testing.T) {
 		t.Fatalf("Foo.iqpython was removed: %v", err)
 	}
 }
+
+func TestWatcherLaterChangeWinsWhenBothFilesChange(t *testing.T) {
+	dir := t.TempDir()
+	writeTemp(t, dir, "Foo.py", "a\n")
+	if _, err := PyToIQ(dir, "Foo"); err != nil {
+		t.Fatal(err)
+	}
+	logs, failures := startWatcher(t, dir)
+
+	// Both files change inside one debounce window. The .iqpython edit is the later change.
+	writeTemp(t, dir, "Foo.py", "b\n")
+	iq := readTemp(t, dir, "Foo.iqpython")
+	if !strings.Contains(iq, `a\n`) {
+		t.Fatalf("Foo.iqpython has no a\\n to replace: %q", iq)
+	}
+	writeTemp(t, dir, "Foo.iqpython", strings.Replace(iq, `a\n`, `c\n`, 1))
+
+	waitFor(t, logs, failures, "Updated Foo.py from Foo.iqpython")
+	if got := readTemp(t, dir, "Foo.py"); got != "c\n" {
+		t.Fatalf("Foo.py = %q, want the later change %q", got, "c\n")
+	}
+}

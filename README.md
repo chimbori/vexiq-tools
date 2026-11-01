@@ -35,14 +35,16 @@ doesn’t change the content does nothing.
 Notes:
 
 - The app only looks at the top level of the folder. Subfolders are ignored.
-- If the folder is not inside a Git repository, the app shows a warning. Watching still works.
-  We recommend keeping your project in Git so you can review and undo the changes the sync makes.
+- We recommend keeping your project in Git, so you can review and undo the changes the sync
+  makes.
 - Watching does not start automatically. You must click **Start Watching** each time.
 - Starting to watch does not change existing files. Only later saves are synced.
 - You can’t change the folder while watching. Stop first.
 - If a `.py` file has no matching `.iqpython` file, one is created from a built-in template.
-- If a `.iqpython` file has no matching `.py` file, the `.py` file is created from the project’s code.
-- Deleting a file does not delete its match.
+- If a `.iqpython` file has no matching `.py` file, the `.py` file is created from the
+  project’s code.
+- Deleting a file does not delete its match. The app logs the deletion and leaves the other
+  file alone.
 - If a `.iqpython` file isn’t valid JSON, the app leaves it alone and logs an error.
 
 ### Troubleshooting
@@ -51,8 +53,8 @@ Notes:
 |---|---|
 | Start Watching is disabled | Choose a directory first. |
 | "Folder is not writable." | Check the folder permissions. |
-| Log says `Error: … invalid character …` | Open the `.iqpython` file and check that it is valid JSON, or restore it from a backup. |
-| A save doesn’t sync | Make sure you are watching the right folder and that the file is at the top level of the folder. |
+| `Error: … invalid character …` in the log | Check that the `.iqpython` file is valid JSON. |
+| A save doesn’t sync | Check the right folder is watched and the file is at the top level. |
 | Changes don’t appear in VEXcode IQ | Close and reopen the project in VEXcode IQ. |
 
 ## Development
@@ -74,7 +76,9 @@ This installs everything needed to build the app:
 It is safe to run again; anything already installed is skipped.
 
 `task setup` supports macOS only. On Windows or Linux, install the same tools manually: Go,
-[Task](https://taskfile.dev/), and the [Tailwind CSS standalone CLI](https://tailwindcss.com/blog/standalone-cli).
+[Task](https://taskfile.dev/), the
+[Tailwind CSS standalone CLI](https://tailwindcss.com/blog/standalone-cli), `librsvg`, and
+ImageMagick.
 
 ### Layout
 
