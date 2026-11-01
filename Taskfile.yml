@@ -86,4 +86,4 @@ tasks:
       - mkdir -p "bin/Tools for Vex IQ.app/Contents/MacOS" "bin/Tools for Vex IQ.app/Contents/Resources"
       - cp src/build/darwin/Info.plist "bin/Tools for Vex IQ.app/Contents/Info.plist"
       - cp src/build/darwin/icons.icns "bin/Tools for Vex IQ.app/Contents/Resources/icons.icns"
-      - cp bin/vexiqtools "bin/Tools for Vex IQ.app/Contents/MacOS/vexiqtools"
+      - mv bin/vexiqtools "bin/Tools for Vex IQ.app/Contents/MacOS/vexiqtools"
